@@ -1,14 +1,26 @@
 local debug	-- debug(msg)
 
-ItemDB = {
+BAGID_TOKENS_BAG = -4
+BAGID_KEYRING = -2
+BAGID_BANK_CONTENT = -1
+BAGID_BACKPACK = 0
+BAGID_BAG1 = 1
+BAGID_BAG2 = 2
+BAGID_BAG3 = 2
+BAGID_BAG4 = 4
+BAGID_BANK_BAG1 = 5
+BAGID_BANK_BAG2 = 6
+BAGID_BANK_BAG3 = 7
+BAGID_BANK_BAG4 = 8
+BAGID_BANK_BAG5 = 9
+BAGID_BANK_BAG6 = 10
 
-}
+BAGIDS_BANK = { BAGID_BANK_CONTENT, BAGID_BANK_BAG1 ,BAGID_BANK_BAG2, BAGID_BANK_BAG3, BAGID_BANK_BAG4, BAGID_BANK_BAG5, BAGID_BANK_BAG6 }
 
 local frame = CreateFrame("FRAME", "FooAddonFrame");
 frame:RegisterEvent("ADDON_LOADED");
-frame:RegisterEvent("ITEM_PUSH");
-frame:RegisterEvent("DELETE_ITEM_CONFIRM");
 frame:RegisterEvent("BAG_UPDATE");
+frame:RegisterEvent("BANKFRAME_OPENED");
 frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED");
 
 function debug(msg)
@@ -30,30 +42,38 @@ end)
 
 local function eventHandler()
   if event == "ADDON_LOADED" and arg1 == "oxBag" then
+    if not ItemDB then
+      ItemDB = {}
+    end
     InstallHooks()
   end
 
-  if event == "BAG_UPDATE" then
-    bagID = arg1
-
-    -- ignore bag updates for bank slots, they are fired upon login, but we can only access the bank while it is open
-    if bagID < 5 then
-      OnBagUpdate(bagID)
+  if event == "BANKFRAME_OPENED" then
+    -- scan the whole bank, including bags
+    for bagID in BAGIDS_BANK do
+      UpdateBag(bagID)
     end
   end
 
+  if event == "BAG_UPDATE" then
+    -- update the specific bag
+    UpdateBag(arg1)
+  end
+
   if event == "PLAYERBANKSLOTS_CHANGED" then
-    -- we do not get any information about which bank slot has changed, so we need to check all
-    for bagID = 5, 12 do
-      OnBagUpdate(bagID)
-    end
+    -- update the bank itself
+    UpdateBag(BAGID_BANK_CONTENT)
   end
 end
 frame:SetScript("OnEvent", eventHandler);
 
-function OnBagUpdate(bagID)
+function UpdateBag(bagID)
+  -- only update bank-related bags if bank is open
+  if IsBagIDInBank(bagID) and not BankFrame then
+    return
+  end
+
   local numSlots = GetContainerNumSlots(bagID)
-  --message("Container " .. bagID .. " has " .. numSlots .. " slots")
 
   -- empty the stored bag
   ItemDB[bagID] = {}
@@ -66,10 +86,12 @@ function OnBagUpdate(bagID)
     if itemLink then
       local _, itemCount = GetContainerItemInfo(bagID, slot)
 
-      --message("Storing " .. itemCount .. " of " .. itemLink .. " in " .. bagID)
-
       -- store itemLink and count in our database
-      ItemDB[bagID][itemLink] = itemCount
+      if not ItemDB[bagID][itemLink] then
+        ItemDB[bagID][itemLink] = itemCount
+      else
+        ItemDB[bagID][itemLink] = ItemDB[bagID][itemLink] + itemCount
+      end
     end
   end
 end
@@ -91,8 +113,7 @@ function GetItemCount(needle)
   for bagID, bag in ItemDB do
     for itemLink, count in bag do
       if itemLink == needle then
-        -- bags with an ID greater or equal 7 are bank slots
-        if bagID >= 5 then
+        if IsBagIDInBank(bagID) then
           inBank = inBank + count
         else
           inBag = inBag + count
@@ -103,4 +124,8 @@ function GetItemCount(needle)
   end
 
   return inBag, inBank, total
+end
+
+function IsBagIDInBank(bagID)
+  return (bagID >= BAGID_BANK_BAG1 or bagID == BAGID_BANK_CONTENT)
 end
