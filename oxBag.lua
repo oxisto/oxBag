@@ -1,4 +1,4 @@
-local debug	-- debug(msg)
+local debug  -- debug(msg)
 
 BAGID_TOKENS_BAG = -4
 BAGID_KEYRING = -2
@@ -15,56 +15,82 @@ BAGID_BANK_BAG4 = 8
 BAGID_BANK_BAG5 = 9
 BAGID_BANK_BAG6 = 10
 
-BAGIDS_BANK = { BAGID_BANK_CONTENT, BAGID_BANK_BAG1 ,BAGID_BANK_BAG2, BAGID_BANK_BAG3, BAGID_BANK_BAG4, BAGID_BANK_BAG5, BAGID_BANK_BAG6 }
+BAGIDS_BANK = {
+  BAGID_BANK_CONTENT,
+  BAGID_BANK_BAG1,
+  BAGID_BANK_BAG2,
+  BAGID_BANK_BAG3,
+  BAGID_BANK_BAG4,
+  BAGID_BANK_BAG5,
+  BAGID_BANK_BAG6
+}
 
-local frame = CreateFrame("FRAME", "FooAddonFrame");
-frame:RegisterEvent("ADDON_LOADED");
-frame:RegisterEvent("BAG_UPDATE");
-frame:RegisterEvent("BANKFRAME_OPENED");
-frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED");
-frame:RegisterEvent("BANKFRAME_OPENED");
+local frame = CreateFrame("FRAME", "FooAddonFrame")
+frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("BAG_UPDATE")
+frame:RegisterEvent("BANKFRAME_OPENED")
+frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+frame:RegisterEvent("BANKFRAME_OPENED")
 
 function debug(msg)
-  if ( DEFAULT_CHAT_FRAME) then
+  if (DEFAULT_CHAT_FRAME) then
     DEFAULT_CHAT_FRAME:AddMessage(msg, 1.0, 0.35, 0.15)
   end
 end
 
 function info(msg)
-  if ( DEFAULT_CHAT_FRAME) then
+  if (DEFAULT_CHAT_FRAME) then
     DEFAULT_CHAT_FRAME:AddMessage(msg, 0.2, 1.0, 0.15)
   end
 end
 
 local function eventHandler(self, event, ...)
-  debug("Got event " .. event)
   if event == "ADDON_LOADED" then
     name = ...
 
     if name == "oxBag" then
-      if not ItemDB then
-        ItemDB = {}
-      end
-
       InstallHooks()
 
       info("oxBag loaded")
+
+      if not ItemDB then
+        ItemDB = {}
+        debug("Creating new item DB...")
+      else
+        debug("Loaded existing item DB data")
+      end
     end
   end
 
   if event == "BAG_UPDATE" then
     bagID = ...
 
+    debug("Got BAG_UPDATE event for bag " .. bagID)
+
     -- update the specific bag
     UpdateBag(bagID)
   end
 
+  if event == "BANKFRAME_OPENED" then
+    -- scan the whole bank, including bags
+
+    debug("Got BANKFRAME_OPENED event")
+
+    for bagID in pairs(BAGIDS_BANK) do
+      UpdateBag(bagID)
+    end
+  end
+
   if event == "PLAYERBANKSLOTS_CHANGED" then
+    slot = ...
+
+    debug("Got PLAYERBANKSLOTS_CHANGED event for slot " .. slot)
+
     -- update the bank itself
     UpdateBag(BAGID_BANK_CONTENT)
   end
 end
-frame:SetScript("OnEvent", eventHandler);
+frame:SetScript("OnEvent", eventHandler)
 
 function UpdateBag(bagID)
   -- only update bank-related bags if bank is open
@@ -73,7 +99,7 @@ function UpdateBag(bagID)
   end
 
   local numSlots = GetContainerNumSlots(bagID)
-  --debug("Container " .. bagID .. " has " .. numSlots .. " slots")
+  debug("Container " .. bagID .. " has " .. numSlots .. " slots")
 
   -- empty the stored bag
   ItemDB[bagID] = {}
@@ -86,7 +112,7 @@ function UpdateBag(bagID)
     if itemLink then
       local _, itemCount = GetContainerItemInfo(bagID, slot)
 
-      --debug("Storing " .. itemCount .. " of " .. itemLink .. " in " .. bagID)
+      debug("Storing " .. itemCount .. " of " .. itemLink .. " in " .. bagID)
 
       -- store itemLink and count in our database
       if not ItemDB[bagID][itemLink] then
@@ -106,14 +132,17 @@ function InstallHooks()
     return hookSetBagItem(self, bagID, slotID)
   end
 
-  GameTooltip:HookScript("OnTooltipSetItem", function(tooltip, ...)
-    local name, link = tooltip:GetItem()
+  GameTooltip:HookScript(
+    "OnTooltipSetItem",
+    function(tooltip, ...)
+      local name, link = tooltip:GetItem()
 
-    inBag, inBank, total = GetItemCount(link)
+      inBag, inBank, total = GetItemCount(link)
 
-    GameTooltip:AddDoubleLine("Total: " .. total, "Bags: " .. inBag .. ", Bank:" .. inBank)
-    GameTooltip:Show()
-  end)
+      GameTooltip:AddDoubleLine("Total: " .. total, "Bags: " .. inBag .. ", Bank:" .. inBank)
+      GameTooltip:Show()
+    end
+  )
 end
 
 function GetItemCount(needle)
@@ -122,6 +151,9 @@ function GetItemCount(needle)
   total = 0
 
   for bagID, bag in pairs(ItemDB) do
+    --local count = bag[needle]
+
+    --if not count == nil then
     for itemLink, count in pairs(bag) do
       if itemLink == needle then
         if IsBagIDInBank(bagID) then
