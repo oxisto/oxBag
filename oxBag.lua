@@ -34,7 +34,7 @@ frame:RegisterEvent("BANKFRAME_OPENED")
 
 function debug(msg)
   if (DEFAULT_CHAT_FRAME) then
-    DEFAULT_CHAT_FRAME:AddMessage(msg, 1.0, 0.35, 0.15)
+  --DEFAULT_CHAT_FRAME:AddMessage(msg, 1.0, 0.35, 0.15)
   end
 end
 
@@ -94,7 +94,7 @@ frame:SetScript("OnEvent", eventHandler)
 
 function UpdateBag(bagID)
   -- only update bank-related bags if bank is open
-  if IsBagIDInBank(bagID) and not BankFrame then
+  if IsBagIDInBank(bagID) and not BankFrame:IsVisible() then
     return
   end
 
